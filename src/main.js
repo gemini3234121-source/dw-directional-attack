@@ -1,6 +1,6 @@
 import OBR from "@owlbear-rodeo/sdk";
 import "./style.css";
-import { KEY, SECRET, NAMES, compass, getState, setState, roll2d6, rollText, esc } from "./shared.js";
+import { KEY, SECRET, NAMES, compass, getState, setState, roll2d6, esc } from "./shared.js";
 
 const app = document.getElementById("app");
 const asPlayer = new URLSearchParams(location.search).get("view") === "player";
@@ -12,43 +12,100 @@ const HINT = {
   clear: "ชัดเจน! การโจมตีมาจากทิศที่เรืองสีแดง",
 };
 
+const ROLL = 1800; // เวลาที่เต๋ากลิ้ง (ms) — ปรับได้
+const BEAT = 1500; // จังหวะเว้นให้ลุ้นก่อนเฉลยขั้นต่อไป (ms) — ปรับได้
+
+// นาฬิกาต่อเครื่อง: เริ่มนับเมื่อเครื่องนั้นเห็นการทอยครั้งใหม่ (ทุกคนจึงเห็นเต๋ากลิ้งพร้อมกัน)
+const t0 = {};
+let booted = false, timer, tick, redraw = () => {};
+const age = (k) => {
+  if (!(k in t0)) t0[k] = booted ? Date.now() : -1e12; // เปิดหน้าต่างทีหลัง = ข้ามแอนิเมชัน
+  return Date.now() - t0[k];
+};
+
 OBR.onReady(async () => {
   const [me, role] = await Promise.all([OBR.player.getId(), OBR.player.getRole()]);
   let state = await getState();
-  const draw = () => (role === "GM" && !asPlayer ? drawGM(state, me) : drawPlayer(state, me));
+  redraw = () => (role === "GM" && !asPlayer && !state ? drawGM(me) : drawPlayer(state, me, role));
   OBR.room.onMetadataChange((m) => {
     const next = m[KEY] || null;
-    if (JSON.stringify(next) !== JSON.stringify(state)) { state = next; draw(); }
+    if (JSON.stringify(next) !== JSON.stringify(state)) { state = next; redraw(); }
   });
-  draw();
+  redraw();
 });
 
-/* ---------------- ผู้เล่น ---------------- */
-function drawPlayer(s, me) {
-  if (!s || s.targetId !== me) { app.innerHTML = `<p class="muted">ยังไม่มีการโจมตีที่เล็งมาที่คุณ</p>`; return; }
-  const st = {};
-  if (s.hint?.kind === "glow") s.hint.dirs.forEach((d) => (st[d] = "glow"));
-  if (s.hint?.kind === "clear") st[s.hint.dirs[0]] = "real";
-  if (s.reveal) { s.reveal.fakes.forEach((d) => (st[d] = "fake")); st[s.reveal.real] = "real"; }
+/* ---------------- หน้าต่างโจมตี (ทุกคนเห็น) ---------------- */
+const beat = (t) => `<p class="beat">${t}<i>.</i><i>.</i><i>.</i></p>`;
 
-  let h = `<h2>⚔️ ${esc(s.monster)} โจมตี!</h2>` + compass(st);
-  let ask = null;
-  if (!s.perception) ask = "WIS";
-  else h += `<p>🧠 WIS ${rollText(s.perception)}</p>`;
-  if (s.perception && !s.hint) h += `<p class="muted">กำลังรับรู้…</p>`;
-  if (s.hint) h += `<p class="hint">${HINT[s.hint.kind]}</p>`;
-  if (s.hint && !s.defense) ask = s.defStat;
-  if (s.defense) h += `<p>🛡️ ${s.defStat} ${rollText(s.defense)}</p>`;
-  if (s.defense && !s.reveal) h += `<p class="muted">รอ DM เฉลย…</p>`;
-  if (s.reveal) {
-    h += `<p class="big">DM attack ${rollText(s.reveal.atk)}</p>` +
-      `<p>ทิศจริง: <b class="r">${NAMES[s.reveal.real]}</b> · ทิศหลอก: <b class="y">${s.reveal.fakes.map((d) => NAMES[d]).join(", ") || "-"}</b></p>` +
-      `<button id="close">ปิด</button>`;
+function rollHTML(label, r, ph) {
+  const rolling = ph === "roll";
+  const dice = r.dice
+    .map((v) => `<span class="die ${rolling ? "tumble" : ph === "land" ? "land" : ""}">${rolling ? "?" : v}</span>`)
+    .join("");
+  return `<div class="roll"><span class="lbl">${label}</span>${dice}<span class="op">${r.mod < 0 ? "−" : "+"}${Math.abs(r.mod)}</span>` +
+    `<b class="tot ${ph === "land" ? "land" : ""}">${rolling ? "…" : "= " + r.total}</b></div>`;
+}
+
+function drawPlayer(s, me, role) {
+  clearTimeout(timer); clearInterval(tick);
+  if (!s) { app.innerHTML = `<p class="muted">ยังไม่มีการโจมตี</p>`; booted = true; return; }
+  const mine = s.targetId === me, gm = role === "GM";
+
+  const waits = []; // เวลาที่ต้องวาดหน้าใหม่ (ขั้นตอนถัดไปของการลุ้น)
+  const ph = (a, start) => {
+    if (a < start) { waits.push(start - a); return "wait"; }
+    if (a < start + ROLL) { waits.push(start + ROLL - a); return "roll"; }
+    return a < start + ROLL + 700 ? "land" : "done";
+  };
+  const after = (a, t) => (a >= t ? true : (waits.push(t - a), false));
+
+  const ap = s.perception ? age(s.id + "p") : 0;
+  const ad = s.defense ? age(s.id + "d") : 0;
+  const pPh = s.perception ? ph(ap, 0) : null;
+  const hintOn = !!s.hint && after(ap, ROLL + BEAT); // ทิศโผล่หลังเต๋า WIS หยุด + จังหวะลุ้น
+  const dPh = s.defense ? ph(ad, 0) : null;
+  const aPh = s.reveal ? ph(ad, ROLL + BEAT) : null; // เต๋า DM กลิ้งหลังเต๋าป้องกันหยุด
+  const revealOn = !!s.reveal && after(ad, 2 * ROLL + 2 * BEAT); // เฉลยทิศหลังเต๋า DM หยุด
+
+  const sec = gm ? secret() : null, st = {};
+  if (sec?.id === s.id) { sec.fakes.forEach((d) => (st[d] = "fake")); st[sec.real] = "real"; } // GM เห็นความจริงเสมอ
+  else {
+    if (hintOn && s.hint.kind === "glow") s.hint.dirs.forEach((d) => (st[d] = "glow"));
+    if (hintOn && s.hint.kind === "clear") st[s.hint.dirs[0]] = "real";
+    if (revealOn) { s.reveal.fakes.forEach((d) => (st[d] = "fake")); st[s.reveal.real] = "real"; }
   }
+
+  let h = `<h2>⚔️ ${esc(s.monster)} → ${esc(s.targetName)}</h2>` + compass(st);
+  let ask = null;
+
+  if (!s.perception) {
+    if (mine) ask = "WIS"; else h += `<p class="muted">รอ ${esc(s.targetName)} ทอย WIS…</p>`;
+  } else {
+    h += rollHTML("WIS", s.perception, pPh);
+    if (pPh === "land" || pPh === "done") h += hintOn ? `<p class="hint">${HINT[s.hint.kind]}</p>` : beat("กำลังรับรู้");
+  }
+
+  if (hintOn && !s.defense) {
+    if (mine) ask = s.defStat; else h += `<p class="muted">รอ ${esc(s.targetName)} ทอย ${s.defStat}…</p>`;
+  }
+  if (s.defense) {
+    h += rollHTML(s.defStat, s.defense, dPh);
+    if (!s.reveal) h += `<p class="muted">รอ DM…</p>`;
+    else if (aPh === "wait") { if (dPh !== "roll") h += beat("DM กำลังทอย"); }
+    else h += rollHTML("DM", s.reveal.atk, aPh);
+  }
+  if (revealOn) {
+    h += `<p>ทิศจริง: <b class="r">${NAMES[s.reveal.real]}</b> · ทิศหลอก: <b class="y">${s.reveal.fakes.map((d) => NAMES[d]).join(", ") || "-"}</b></p>`;
+  }
+
   if (ask) h += `<label>${ask} modifier <input id="mod" type="number" value="0"></label><button id="go">ทอย ${ask}</button>`;
+  if (gm) h += `<button id="clear">จบการโจมตี</button>`;
+  h += `<button id="close" class="ghost">ปิดหน้าต่าง</button>`;
   app.innerHTML = h;
 
-  app.querySelector("#close")?.addEventListener("click", () => OBR.popover.close("dw-attack"));
+  app.querySelector("#close").onclick = () => { OBR.popover.close("dw-attack"); OBR.action.close(); };
+  const clr = app.querySelector("#clear");
+  if (clr) clr.onclick = () => { localStorage.removeItem(SECRET); setState(null); };
   app.querySelector("#go")?.addEventListener("click", async () => {
     const cur = await getState();
     if (!cur || cur.id !== s.id) return;
@@ -58,30 +115,22 @@ function drawPlayer(s, me) {
     else return;
     await setState(cur);
   });
+
+  if (waits.length) timer = setTimeout(redraw, Math.min(...waits) + 30);
+  if (app.querySelector(".tumble")) {
+    tick = setInterval(() => app.querySelectorAll(".tumble").forEach((e) => (e.textContent = 1 + Math.floor(Math.random() * 6))), 70);
+  }
+  booted = true;
 }
 
-/* ---------------- DM ---------------- */
+/* ---------------- แผงควบคุม DM ---------------- */
 const cycle = (d) => {
   if (pick.real === d) { pick.real = null; pick.fakes.add(d); } // จริง → หลอก
   else if (pick.fakes.has(d)) pick.fakes.delete(d); // หลอก → ว่าง
   else pick.real = d; // ว่าง → จริง
 };
 
-async function drawGM(s, me) {
-  if (s) {
-    const sec = secret(), st = {};
-    if (sec?.id === s.id) { sec.fakes.forEach((d) => (st[d] = "fake")); st[sec.real] = "real"; }
-    const step = !s.perception ? `รอ ${esc(s.targetName)} ทอย WIS` : !s.hint ? "กำลังตัดสินผล…" : !s.defense ? `รอทอยป้องกัน (${s.defStat})` : "เฉลยแล้ว";
-    app.innerHTML =
-      `<h2>⚔️ ${esc(s.monster)} → ${esc(s.targetName)}</h2><p>สถานะ: <b>${step}</b></p>` + compass(st) +
-      (s.perception ? `<p>🧠 WIS ${rollText(s.perception)}</p>` : "") +
-      (s.defense ? `<p>🛡️ ${s.defStat} ${rollText(s.defense)}</p>` : "") +
-      (sec ? `<p>DM attack ${rollText(sec.atk)}</p>` : "") +
-      `<button id="clear">จบการโจมตี</button>`;
-    app.querySelector("#clear").onclick = () => { localStorage.removeItem(SECRET); setState(null); };
-    return;
-  }
-
+async function drawGM(me) {
   const players = [
     { id: me, name: (await OBR.player.getName()) + " (GM)" },
     ...(await OBR.party.getPlayers()).filter((p) => p.role !== "GM"),
@@ -121,5 +170,6 @@ async function drawGM(s, me) {
       targetId: t.id, targetName: t.name, defStat: app.querySelector("#def").value,
     });
     pick.real = null; pick.fakes.clear();
+    OBR.action.close(); // ปิดแผง DM เพื่อให้เห็นหน้าต่างโจมตีที่เด้งขึ้น
   };
 }

@@ -1,0 +1,28 @@
+:root { color-scheme: dark; --ink:#14161f; --panel:#1e2230; --line:#3a4058; --ember:#ff5a4d; --brass:#e0b84f; --ghost:#9ab8ff; }
+* { box-sizing: border-box; }
+body { margin:0; padding:14px; background:var(--ink); color:#e9ebf5; font:14px/1.55 "Noto Sans Thai","Sarabun",system-ui,sans-serif; }
+h2 { margin:0 0 6px; font-size:18px; }
+p { margin:6px 0; }
+.muted { color:#8d93ad; }
+.hint { color:var(--ghost); }
+.big { font-size:15px; }
+.r { color:var(--ember); } .y { color:var(--brass); }
+label { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:6px 0; }
+input, select { width:150px; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:inherit; font:inherit; }
+button { width:100%; margin-top:10px; padding:9px; border:1px solid var(--ember); border-radius:8px; background:transparent; color:#ffd9d4; font:inherit; font-weight:600; cursor:pointer; }
+button:hover { background:#3a1d22; }
+button:focus-visible, .dir:focus-visible { outline:2px solid var(--ghost); outline-offset:2px; }
+
+.compass { display:grid; grid-template:repeat(3,64px)/repeat(3,64px); gap:6px; justify-content:center; margin:12px 0; }
+.me { grid-area:2/2; display:grid; place-items:center; font-size:28px; }
+.dir { width:auto; margin:0; padding:0; border:1px solid var(--line); border-radius:12px; background:var(--panel); color:#5d6480; font-size:28px; cursor:default; }
+.dir:not(:disabled) { color:#b8bdd6; cursor:pointer; }
+.dir:not(:disabled):hover { background:#2a3046; }
+.dir.real { color:var(--ember); border-color:var(--ember); background:#3b1a20; box-shadow:0 0 16px var(--ember); }
+.dir.fake { color:var(--brass); border-color:var(--brass); background:#3a3217; box-shadow:0 0 16px var(--brass); }
+.dir.glow { animation:flick var(--s) var(--d) infinite alternate ease-in-out; }
+@keyframes flick {
+  from { color:#5d6480; border-color:var(--line); background:var(--panel); box-shadow:none; }
+  to   { color:#fff; border-color:var(--ghost); background:#2e3c70; box-shadow:0 0 20px var(--ghost); }
+}
+@media (prefers-reduced-motion: reduce) { .dir.glow { animation:none; color:var(--ghost); border-color:var(--ghost); } }

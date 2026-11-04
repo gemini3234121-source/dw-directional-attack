@@ -1,0 +1,10 @@
+{
+  "name": "Dungeon World: Directional Attack",
+  "version": "1.0.0",
+  "manifest_version": 1,
+  "author": "you",
+  "description": "ระบบโจมตีเป็นทิศทาง 8 ทิศ พร้อมทิศหลอก สำหรับ Dungeon World",
+  "icon": "icon.svg",
+  "action": { "title": "Directional Attack", "icon": "icon.svg", "popover": "index.html", "width": 360, "height": 620 },
+  "background_url": "background.html"
+}

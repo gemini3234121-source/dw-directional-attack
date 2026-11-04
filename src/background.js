@@ -18,7 +18,7 @@ async function referee(s) {
 }
 
 OBR.onReady(async () => {
-  const [me, role] = await Promise.all([OBR.player.getId(), OBR.player.getRole()]);
+  const role = await OBR.player.getRole();
   let seen = null;
 
   const react = async (s) => {
@@ -26,13 +26,15 @@ OBR.onReady(async () => {
     if (s.id !== seen) {
       seen = s.id;
       // เปิดให้ "ทุกคน" ในห้องเห็นการโจมตีแบบเรียลไทม์ (เป้าหมายเท่านั้นที่ทอยได้)
+      // disableClickAway เปิดให้ทุกคน: หน้าต่างต้องไม่หายเองเมื่อผู้เล่นคลิกแผนที่ ไม่งั้นจะพลาดเต๋า/เฉลยที่ตามมา
+      // (ปิดได้ด้วยปุ่ม "ปิดหน้าต่าง" หรือเมื่อ DM กด "จบการโจมตี")
       if (!s.reveal) {
         OBR.popover.open({
           id: "dw-attack",
           url: new URL("index.html?view=player", location.href).href,
           width: 360,
           height: 660,
-          disableClickAway: s.targetId === me,
+          disableClickAway: true,
         });
       }
     }

@@ -25,16 +25,15 @@ OBR.onReady(async () => {
     if (!s) { seen = null; OBR.popover.close("dw-attack"); return; }
     if (s.id !== seen) {
       seen = s.id;
-      if (s.targetId === me && !s.reveal) {
+      // เปิดให้ "ทุกคน" ในห้องเห็นการโจมตีแบบเรียลไทม์ (เป้าหมายเท่านั้นที่ทอยได้)
+      if (!s.reveal) {
         OBR.popover.open({
           id: "dw-attack",
           url: new URL("index.html?view=player", location.href).href,
           width: 360,
-          height: 620,
-          disableClickAway: true,
+          height: 660,
+          disableClickAway: s.targetId === me,
         });
-      } else if (s.targetId !== me) {
-        OBR.notification.show(`⚔️ ${s.monster} กำลังโจมตี ${s.targetName}!`, "WARNING");
       }
     }
     if (role === "GM") await referee(s);

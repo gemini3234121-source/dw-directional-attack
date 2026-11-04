@@ -1,16 +1,16 @@
-:root { color-scheme: dark; --ink:#14161f; --panel:#1e2230; --line:#3a4058; --ember:#ff5a4d; --brass:#e0b84f; --ghost:#9ab8ff; }
-* { box-sizing: border-box; }
+:root { color-scheme:dark; --ink:#14161f; --panel:#1e2230; --line:#3a4058; --ember:#ff5a4d; --brass:#e0b84f; --ghost:#9ab8ff; }
+* { box-sizing:border-box; }
 body { margin:0; padding:14px; background:var(--ink); color:#e9ebf5; font:14px/1.55 "Noto Sans Thai","Sarabun",system-ui,sans-serif; }
 h2 { margin:0 0 6px; font-size:18px; }
 p { margin:6px 0; }
 .muted { color:#8d93ad; }
 .hint { color:var(--ghost); }
-.big { font-size:15px; }
 .r { color:var(--ember); } .y { color:var(--brass); }
 label { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:6px 0; }
 input, select { width:150px; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:inherit; font:inherit; }
 button { width:100%; margin-top:10px; padding:9px; border:1px solid var(--ember); border-radius:8px; background:transparent; color:#ffd9d4; font:inherit; font-weight:600; cursor:pointer; }
 button:hover { background:#3a1d22; }
+button.ghost { border-color:var(--line); color:#8d93ad; font-weight:400; }
 button:focus-visible, .dir:focus-visible { outline:2px solid var(--ghost); outline-offset:2px; }
 
 .compass { display:grid; grid-template:repeat(3,64px)/repeat(3,64px); gap:6px; justify-content:center; margin:12px 0; }
@@ -25,4 +25,25 @@ button:focus-visible, .dir:focus-visible { outline:2px solid var(--ghost); outli
   from { color:#5d6480; border-color:var(--line); background:var(--panel); box-shadow:none; }
   to   { color:#fff; border-color:var(--ghost); background:#2e3c70; box-shadow:0 0 20px var(--ghost); }
 }
-@media (prefers-reduced-motion: reduce) { .dir.glow { animation:none; color:var(--ghost); border-color:var(--ghost); } }
+
+/* เต๋า */
+.roll { display:flex; align-items:center; gap:8px; margin:10px 0; }
+.lbl { width:56px; color:#8d93ad; font-size:13px; }
+.die { display:grid; place-items:center; width:44px; height:44px; border-radius:10px; background:#f1ede4; color:#14161f; font-size:24px; font-weight:700; box-shadow:inset 0 -4px 0 #c9c3b5; }
+.die.tumble { animation:shake .16s infinite; }
+.die.land, .tot.land { animation:pop .45s ease-out; }
+.op { color:#b8bdd6; font-size:16px; }
+.tot { font-size:26px; min-width:70px; }
+@keyframes shake { 0%{transform:rotate(-9deg) translateY(-2px)} 50%{transform:rotate(9deg) translateY(2px)} 100%{transform:rotate(-9deg) translateY(-2px)} }
+@keyframes pop { 0%{transform:scale(1.5)} 60%{transform:scale(.92)} 100%{transform:scale(1)} }
+
+/* จังหวะลุ้น */
+.beat { color:var(--ghost); letter-spacing:.04em; }
+.beat i { font-style:normal; animation:blink 1s infinite; }
+.beat i:nth-child(2) { animation-delay:.2s; } .beat i:nth-child(3) { animation-delay:.4s; }
+@keyframes blink { 0%,100%{opacity:.2} 50%{opacity:1} }
+
+@media (prefers-reduced-motion: reduce) {
+  .dir.glow { animation:none; color:var(--ghost); border-color:var(--ghost); }
+  .die.tumble, .die.land, .tot.land { animation:none; }
+}
